@@ -1,3 +1,4 @@
+import ReactDOM from "react-dom/client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
@@ -498,3 +499,9 @@ export default function LeakWatch() {
     </div>
   );
 }
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <LeakWatch />
+  </React.StrictMode>
+);
