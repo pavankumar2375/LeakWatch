@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LeakWatch — AI-Powered Early-Warning System for NEET Paper Leaks</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#080b18; --panel:#111834; --panelAlt:#0d1329; --border:#232c52;
+    --cyan:#22d3ee; --purple:#a78bfa; --pink:#f472b6; --amber:#fbbf24;
+    --green:#4ade80; --red:#fb7185; --text:#e7ebfa; --muted:#8892b8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  header{position:relative;border-bottom:1px solid var(--border);overflow:hidden;}
+  header::before{content:"";position:absolute;inset:0;opacity:.3;
+    background:radial-gradient(600px 200px at 15% 0%, rgba(34,211,238,.25), transparent),
+               radial-gradient(600px 200px at 85% 100%, rgba(167,139,250,.2), transparent);}
+  .headerInner{position:relative;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#22d3ee,#a78bfa);
+    display:flex;align-items:center;justify-content:center;font-size:20px;}
+  .titleRow{display:flex;align-items:center;gap:8px;}
+  h1{font-size:20px;font-weight:800;margin:0;letter-spacing:-.3px;}
+  .livePill{display:flex;align-items:center;gap:5px;font-size:10px;font-family:ui-monospace,monospace;
+    padding:2px 8px;border-radius:99px;background:rgba(74,222,128,.15);color:var(--green);}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+  .sub{font-size:12px;color:var(--muted);margin:2px 0 0;}
+  .ctrls{display:flex;align-items:center;gap:10px;font-family:ui-monospace,monospace;font-size:12px;color:var(--muted);}
+  button{cursor:pointer;font-family:inherit;}
+  .btn{display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:10px;border:1px solid var(--border);
+    background:var(--panelAlt);color:var(--text);font-size:12px;}
+  #alertBanner{display:none;padding:10px 20px;align-items:center;gap:8px;font-family:ui-monospace,monospace;font-size:14px;
+    background:rgba(251,113,133,.15);color:var(--red);border-bottom:1px solid var(--red);}
+  .grid{padding:20px;display:grid;grid-template-columns:1fr;gap:16px;}
+  @media(min-width:1024px){.grid{grid-template-columns:repeat(3,1fr);}}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .span2{grid-column:span 1;}
+  @media(min-width:1024px){.span2{grid-column:span 2;}}
+  .panelHead{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .panelHead h2{font-size:14px;font-weight:700;margin:0;}
+  .panelHead .tag{margin-left:auto;font-size:10px;font-family:ui-monospace,monospace;color:var(--muted);}
+  #feed{overflow-y:auto;max-height:260px;display:flex;flex-direction:column;gap:6px;padding-right:4px;}
+  .msg{display:flex;gap:8px;font-size:12px;font-family:ui-monospace,monospace;padding:6px 8px;border-radius:10px;
+    background:var(--panelAlt);border:1px solid var(--border);}
+  .msg.flag{background:rgba(251,113,133,.1);border-color:rgba(251,113,133,.4);color:var(--red);}
+  .msg .t{color:var(--muted);min-width:58px;}
+  .msg .txt{flex:1;}
+  .msg .sc{font-weight:700;min-width:26px;text-align:right;}
+  .inputRow{display:flex;gap:8px;margin-top:12px;}
+  #customInput{flex:1;font-size:12px;font-family:ui-monospace,monospace;border-radius:10px;padding:8px 10px;
+    background:var(--panelAlt);border:1px solid var(--border);color:var(--text);outline:none;}
+  #analyzeBtn{padding:8px 12px;border-radius:10px;border:none;background:var(--cyan);color:#04121a;font-weight:700;font-size:12px;}
+  #customResult{font-size:11px;font-family:ui-monospace,monospace;color:var(--muted);margin-top:6px;}
+  .barExplain{font-size:10px;text-align:center;margin-top:6px;font-family:ui-monospace,monospace;color:var(--muted);}
+  .engineNote{margin-top:14px;border-radius:10px;padding:10px;background:var(--panelAlt);border:1px solid var(--border);}
+  .engineNote p{margin:0 0 4px;font-size:10px;font-family:ui-monospace,monospace;font-weight:700;}
+  .engineNote span{font-size:10px;line-height:1.5;color:var(--muted);}
+  #spikeBtn{width:100%;margin-top:12px;padding:9px;border:none;border-radius:10px;font-weight:700;font-size:12px;
+    background:linear-gradient(90deg,#f472b6,#fb7185);color:#1a0410;}
+  .lab-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .imgSlot{border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--panelAlt);}
+  .imgSlot p{font-size:11px;color:var(--muted);margin:0 0 8px;}
+  .imgSlot img{width:100%;height:96px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:block;}
+  .imgPlaceholder{width:100%;height:96px;border-radius:8px;background:var(--bg);display:flex;align-items:center;
+    justify-content:center;margin-bottom:8px;color:var(--muted);font-size:20px;}
+  .imgSlot label{font-size:10px;color:var(--cyan);text-decoration:underline;cursor:pointer;}
+  #matchResult{margin-top:10px;font-size:12px;font-family:ui-monospace,monospace;display:none;}
+  #alertsLog{display:flex;flex-direction:column;gap:8px;max-height:190px;overflow-y:auto;}
+  .alertItem{font-size:11px;font-family:ui-monospace,monospace;border-radius:10px;padding:8px;
+    background:rgba(251,113,133,.08);border:1px solid rgba(251,113,133,.3);}
+  .alertItem .row{display:flex;justify-content:space-between;color:var(--muted);}
+  .alertItem .row span:first-child{color:var(--red);}
+  footer{padding:0 20px 24px;text-align:center;font-size:10px;font-family:ui-monospace,monospace;color:var(--muted);}
+  .loadDemoBtn{margin-left:auto;font-size:11px;padding:5px 10px;border-radius:10px;border:1px solid var(--border);
+    background:var(--panelAlt);color:var(--text);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="headerInner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="logo">📡</div>
+      <div>
+        <div class="titleRow">
+          <h1>LeakWatch</h1>
+          <span class="livePill"><span class="dot"></span> LIVE</span>
+        </div>
+        <p class="sub">Real-time leak-signal interception console · NEET-UG</p>
+      </div>
+    </div>
+    <div class="ctrls">
+      <span id="clock" class="mono"></span>
+      <button class="btn" id="pauseBtn">⏸ Pause feed</button>
+      <button class="btn" id="resetBtn">↺ Reset</button>
+    </div>
+  </div>
+</header>
+
+<div id="alertBanner">🛡 LEAK ALERT — risk score <span id="alertScore">0</span>/100 · notification dispatched to NTA / exam authority</div>
+
+<div class="grid">
+
+  <!-- live feed -->
+  <div class="panel span2" style="min-height:380px;display:flex;flex-direction:column;">
+    <div class="panelHead"><span>📻</span><h2>Live Signal Feed</h2><span class="tag">Telegram · X/Twitter · Tip Forms (simulated)</span></div>
+    <div id="feed"></div>
+    <div class="inputRow">
+      <input id="customInput" placeholder="Type a message to test the classifier, e.g. 'paper out check telegram'" />
+      <button id="analyzeBtn">➤ Analyze</button>
+    </div>
+    <div id="customResult"></div>
+  </div>
+
+  <!-- fusion engine -->
+  <div class="panel" style="min-height:380px;">
+    <div class="panelHead"><span>⚡</span><h2>LeakWatch Fusion Scoring Engine</h2></div>
+    <p class="sub mono" style="margin-top:-6px;margin-bottom:10px;">LFSE v1.0 — multi-signal risk fusion core</p>
+    <canvas id="scoreChart" height="180"></canvas>
+    <p class="barExplain">Fused Risk turns <span style="color:var(--red)">red</span> and crosses the dashed line once NLP, Velocity, and Image evidence agree.</p>
+    <div class="engineNote">
+      <p>Fused Risk = 0.4·NLP + 0.3·Velocity + 0.3·Image</p>
+      <span>No single signal is trusted alone: text chatter is noisy, velocity spikes can be benign, and image proof often arrives late. LFSE only fires an alert once independent signals agree — crossing 68 auto-dispatches a scored notification to the exam authority.</span>
+    </div>
+    <button id="spikeBtn">⚠ Simulate leak spike</button>
+  </div>
+
+  <!-- velocity -->
+  <div class="panel">
+    <div class="panelHead"><span>📈</span><h2>Message Velocity</h2><span class="tag">z-score anomaly detection</span></div>
+    <canvas id="velocityChart" height="160"></canvas>
+  </div>
+
+  <!-- clusters -->
+  <div class="panel">
+    <div class="panelHead"><span>📍</span><h2>Exam-Center Chatter Clusters</h2></div>
+    <canvas id="clusterChart" height="160"></canvas>
+  </div>
+
+  <!-- image lab -->
+  <div class="panel span2">
+    <div class="panelHead"><span>🖼</span><h2>Image Match Lab — perceptual hashing (aHash)</h2>
+      <button class="loadDemoBtn" id="demoPairBtn">Load demo pair</button>
+    </div>
+    <div class="lab-grid">
+      <div class="imgSlot">
+        <p>Official Paper</p>
+        <div id="thumbA-placeholder" class="imgPlaceholder">⬆</div>
+        <img id="thumbA" style="display:none;" />
+        <label>upload image <input type="file" accept="image/*" id="uploadA" style="display:none;" /></label>
+      </div>
+      <div class="imgSlot">
+        <p>Suspected Leak Photo</p>
+        <div id="thumbB-placeholder" class="imgPlaceholder">⬆</div>
+        <img id="thumbB" style="display:none;" />
+        <label>upload image <input type="file" accept="image/*" id="uploadB" style="display:none;" /></label>
+      </div>
+    </div>
+    <div id="matchResult"></div>
+  </div>
+
+  <!-- alerts -->
+  <div class="panel">
+    <div class="panelHead"><span>🛡</span><h2>Alerts Dispatched</h2></div>
+    <div id="alertsLog"><p class="sub" style="font-size:12px;">No alerts yet — try "Simulate leak spike".</p></div>
+  </div>
+
+</div>
+
+<footer>Detect → Verify → Score → Alert · prototype for demo purposes — message stream and image pair are simulated; scoring logic runs live in your browser.</footer>
+
+<script>
+// ---------- data ----------
+const KEYWORDS = {
+  "paper leak":35,"पेपर लीक":35,"leaked":25,"leak":22,"लीक":25,
+  "paper out":32,"पेपर आउट":32,"answer key":20,"आंसर की":20,
+  "solved paper":26,"सॉल्व्ड":18,"booklet leaked":30,"booklet code":10,
+  "telegram group":16,"टेलीग्राम":16,"join group":12,"ग्रुप जॉइन":12,
+  "dm me":10,"dm for":12,"before exam":14,"मिल गया":14,
+  "forward karo":10,"screenshot":8,"pdf available":16,"100% match":15,
+  "confirmed leak":30,"question paper leak":34,"सेट बी":6,"set b leaked":20,
+};
+const BENIGN_POOL = [
+  "All the best for NEET tomorrow guys!",
+  "Traffic near Rajendra Nagar exam centre is heavy today",
+  "Does anyone know the reporting time for NEET 2026?",
+  "Please carry your admit card and a valid ID proof",
+  "Good luck bhai, revise biology notes one last time",
+  "Exam centre address changed, check NTA website",
+  "Feeling nervous about the exam tomorrow, any tips?",
+  "Can someone share the syllabus for the physics section?",
+  "Reached the centre early, security check is strict this year",
+  "Praying for everyone appearing tomorrow, stay calm",
+];
+const LEAK_POOL = [
+  "NEET paper leaked!! check telegram group link in bio",
+  "पेपर आउट हो गया भाई, आंसर की भी मिल गई",
+  "Solved paper pdf available, DM me fast before exam starts",
+  "Join telegram group — NEET question paper leak confirmed",
+  "बायो का पेपर लीक हो गया है, ग्रुप जॉइन करो जल्दी",
+  "Screenshot of leaked answer key attached, forward karo sabko",
+  "Booklet code B leaked, 100% match with today's paper",
+  "Paper out before exam, DM for the group link bhai",
+  "सेट बी लीक हो गया, टेलीग्राम पे मिल जाएगा",
+  "Confirmed leak — physics + chem paper both out on telegram",
+];
+const EXAM_CENTERS = ["Patna","Ranchi","Lucknow","Chennai","Hyderabad","Jaipur","Bhopal","Guwahati"];
+const COLORS = {cyan:"#22d3ee",purple:"#a78bfa",pink:"#f472b6",amber:"#fbbf24",green:"#4ade80",red:"#fb7185",muted:"#8892b8",border:"#232c52"};
+
+function scoreText(raw){
+  const lower = raw.toLowerCase();
+  let score = 0; const hits = [];
+  for (const [kw,w] of Object.entries(KEYWORDS)){
+    if (lower.includes(kw.toLowerCase())){ score += w; hits.push(kw); }
+  }
+  return {score: Math.min(100,score), hits};
+}
+function mean(a){ return a.reduce((x,y)=>x+y,0)/(a.length||1); }
+function std(a){ const m=mean(a); return Math.sqrt(mean(a.map(v=>(v-m)**2))) || 1; }
+
+// ---------- perceptual hash ----------
+function hashFromSource(src){
+  const c = document.createElement("canvas"); c.width=8; c.height=8;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(src,0,0,8,8);
+  const data = ctx.getImageData(0,0,8,8).data;
+  const gray = [];
+  for(let i=0;i<64;i++) gray.push((data[i*4]+data[i*4+1]+data[i*4+2])/3);
+  const avg = mean(gray);
+  return gray.map(v=>v>avg?1:0);
+}
+function hamming(a,b){ let d=0; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) d++; return d; }
+
+// ---------- state ----------
+let running = true;
+let nlpRolling = 0;
+let series = Array.from({length:16},()=>0);
+let alerts = [];
+let clusters = Object.fromEntries(EXAM_CENTERS.map(c=>[c, 2+Math.floor(Math.random()*4)]));
+let imgA = null, imgB = null;
+let alertActive = false;
+let messages = [];
+
+// ---------- charts ----------
+const scoreChart = new Chart(document.getElementById("scoreChart"), {
+  type:"bar",
+  data:{ labels:["Fused Risk","NLP","Velocity","Image"],
+    datasets:[{ data:[0,0,0,0], backgroundColor:[COLORS.green,COLORS.cyan,COLORS.purple,COLORS.pink], borderRadius:6 }]},
+  options:{ responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false},
+      annotation:undefined,
+      tooltip:{ callbacks:{ label:(ctx)=>ctx.formattedValue } } },
+    scales:{ y:{ min:0, max:100, ticks:{color:COLORS.muted}, grid:{color:COLORS.border} },
+             x:{ ticks:{color:"#e7ebfa"}, grid:{display:false} } } }
+});
+const velocityChart = new Chart(document.getElementById("velocityChart"), {
+  type:"line",
+  data:{ labels:series.map((_,i)=>i),
+    datasets:[{ data:series, borderColor:COLORS.purple, borderWidth:2, pointRadius:0, tension:.4 }]},
+  options:{ responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false} },
+    scales:{ x:{display:false}, y:{ ticks:{color:COLORS.muted}, grid:{color:COLORS.border} } } }
+});
+const clusterChart = new Chart(document.getElementById("clusterChart"), {
+  type:"bar",
+  data:{ labels:EXAM_CENTERS, datasets:[{ data:EXAM_CENTERS.map(c=>clusters[c]), backgroundColor:COLORS.amber, borderRadius:4 }]},
+  options:{ responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false} },
+    scales:{ y:{ ticks:{color:COLORS.muted}, grid:{color:COLORS.border} },
+             x:{ ticks:{color:COLORS.muted, font:{size:9}}, grid:{display:false} } } }
+});
+
+function velocityScore(){
+  const recent = mean(series.slice(-3));
+  const baseline = series.slice(0,-3);
+  const z = (recent - mean(baseline)) / std(baseline);
+  return Math.max(0, Math.min(100, 50 + z*22));
+}
+function imageScore(){
+  if (!imgA || !imgB) return 0;
+  return Math.max(0, 100 - (hamming(imgA.hash, imgB.hash)/64)*100*1.6);
+}
+function fusedScore(){
+  return Math.round(0.4*nlpRolling + 0.3*velocityScore() + 0.3*imageScore());
+}
+
+function renderFeed(){
+  const feed = document.getElementById("feed");
+  feed.innerHTML = "";
+  messages.slice(-24).forEach(m=>{
+    const div = document.createElement("div");
+    div.className = "msg" + (m.flagged ? " flag" : "");
+    div.innerHTML = `<span class="t">${m.time}</span><span class="txt">${m.text}</span><span class="sc">${m.score}</span>`;
+    feed.appendChild(div);
+  });
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function updateCharts(){
+  const f = fusedScore();
+  scoreChart.data.datasets[0].data = [f, Math.round(nlpRolling), Math.round(velocityScore()), Math.round(imageScore())];
+  scoreChart.data.datasets[0].backgroundColor = [
+    f>=68?COLORS.red:f>=40?COLORS.amber:COLORS.green, COLORS.cyan, COLORS.purple, COLORS.pink
+  ];
+  scoreChart.update();
+
+  velocityChart.data.labels = series.map((_,i)=>i);
+  velocityChart.data.datasets[0].data = series;
+  velocityChart.update();
+
+  clusterChart.data.datasets[0].data = EXAM_CENTERS.map(c=>clusters[c]);
+  clusterChart.update();
+
+  const banner = document.getElementById("alertBanner");
+  if (f >= 68){
+    banner.style.display = "flex";
+    document.getElementById("alertScore").textContent = f;
+    if (!alertActive){
+      alertActive = true;
+      const center = Object.entries(clusters).sort((a,b)=>b[1]-a[1])[0][0];
+      alerts.unshift({score:f, center, time:new Date().toLocaleTimeString()});
+      alerts = alerts.slice(0,10);
+      renderAlerts();
+    }
+  } else {
+    banner.style.display = "none";
+    if (f < 45) alertActive = false;
+  }
+}
+
+function renderAlerts(){
+  const log = document.getElementById("alertsLog");
+  if (alerts.length === 0){
+    log.innerHTML = `<p class="sub" style="font-size:12px;">No alerts yet — try "Simulate leak spike".</p>`;
+    return;
+  }
+  log.innerHTML = alerts.map(a=>`
+    <div class="alertItem">
+      <div class="row"><span>risk ${a.score}</span><span>${a.time}</span></div>
+      <div>${a.center} · notified NTA</div>
+    </div>`).join("");
+}
+
+function pushMessage(text, forcedLeak){
+  const {score, hits} = scoreText(text);
+  const flagged = score >= 30;
+  messages.push({text, score, hits, flagged, time:new Date().toLocaleTimeString().slice(0,8)});
+  nlpRolling = Math.max(score, nlpRolling*0.85);
+  series[series.length-1] += 1;
+  if (flagged || forcedLeak){
+    const center = EXAM_CENTERS[Math.floor(Math.random()*EXAM_CENTERS.length)];
+    clusters[center] += 1;
+  }
+  renderFeed();
+  updateCharts();
+}
+
+// ---------- intervals ----------
+let feedInterval = setInterval(()=>{
+  if (!running) return;
+  const pool = Math.random() < 0.35 ? LEAK_POOL : BENIGN_POOL;
+  pushMessage(pool[Math.floor(Math.random()*pool.length)]);
+}, 2400);
+
+setInterval(()=>{ series = [...series.slice(1), 0]; updateCharts(); }, 4000);
+
+setInterval(()=>{
+  document.getElementById("clock").textContent = new Date().toLocaleTimeString();
+  nlpRolling = Math.max(0, nlpRolling*0.97);
+  updateCharts();
+}, 1000);
+
+// ---------- controls ----------
+document.getElementById("pauseBtn").onclick = (e)=>{
+  running = !running;
+  e.target.textContent = running ? "⏸ Pause feed" : "▶ Resume feed";
+};
+document.getElementById("resetBtn").onclick = ()=>{
+  messages = []; nlpRolling = 0; series = Array.from({length:16},()=>0);
+  alerts = []; alertActive = false;
+  clusters = Object.fromEntries(EXAM_CENTERS.map(c=>[c, 2+Math.floor(Math.random()*4)]));
+  imgA = null; imgB = null;
+  document.getElementById("thumbA").style.display="none";
+  document.getElementById("thumbB").style.display="none";
+  document.getElementById("thumbA-placeholder").style.display="flex";
+  document.getElementById("thumbB-placeholder").style.display="flex";
+  document.getElementById("matchResult").style.display="none";
+  renderFeed(); renderAlerts(); updateCharts();
+};
+document.getElementById("analyzeBtn").onclick = analyzeCustom;
+document.getElementById("customInput").addEventListener("keydown", e=>{ if(e.key==="Enter") analyzeCustom(); });
+function analyzeCustom(){
+  const val = document.getElementById("customInput").value.trim();
+  if (!val) return;
+  const res = scoreText(val);
+  document.getElementById("customResult").innerHTML =
+    `NLP score: <b style="color:${res.score>=30?COLORS.red:COLORS.green}">${res.score}</b>` +
+    (res.hits.length ? ` · matched: ${res.hits.join(", ")}` : "");
+  pushMessage(val);
+}
+document.getElementById("spikeBtn").onclick = ()=>{
+  let i = 0;
+  const id = setInterval(()=>{
+    pushMessage(LEAK_POOL[Math.floor(Math.random()*LEAK_POOL.length)], true);
+    i++; if (i>=7) clearInterval(id);
+  }, 220);
+};
+
+// ---------- image lab ----------
+function setSlot(slot, hash, thumbSrc){
+  if (slot === "A") imgA = {hash};
+  else imgB = {hash};
+  document.getElementById("thumb"+slot).src = thumbSrc;
+  document.getElementById("thumb"+slot).style.display = "block";
+  document.getElementById("thumb"+slot+"-placeholder").style.display = "none";
+  renderMatchResult();
+}
+function renderMatchResult(){
+  const el = document.getElementById("matchResult");
+  if (imgA && imgB){
+    const dist = hamming(imgA.hash, imgB.hash);
+    const sim = Math.round(imageScore());
+    el.style.display = "block";
+    el.innerHTML = `✅ Hamming distance: <b>${dist}</b>/64 · Similarity: <b style="color:${sim>70?COLORS.red:COLORS.green}">${sim}%</b>` +
+      (sim>70 ? ` <span style="color:${COLORS.red}">— high-confidence match against official booklet</span>` : "");
+    updateCharts();
+  }
+}
+document.getElementById("uploadA").onchange = e=>handleUpload("A", e.target.files[0]);
+document.getElementById("uploadB").onchange = e=>handleUpload("B", e.target.files[0]);
+function handleUpload(slot, file){
+  if (!file) return;
+  const img = new Image();
+  img.onload = ()=> setSlot(slot, hashFromSource(img), img.src);
+  img.src = URL.createObjectURL(file);
+}
+document.getElementById("demoPairBtn").onclick = ()=>{
+  const c1 = document.createElement("canvas"); c1.width=300; c1.height=200;
+  const ctx1 = c1.getContext("2d");
+  ctx1.fillStyle="#f5f5f0"; ctx1.fillRect(0,0,300,200);
+  ctx1.fillStyle="#111"; ctx1.font="bold 16px monospace";
+  ctx1.fillText("NEET-UG 2026 — SET B", 20, 30);
+  for(let i=0;i<10;i++) ctx1.fillText(`Q${i+1}. Option ${String.fromCharCode(65+(i%4))}`, 20, 55+i*14);
+
+  const c2 = document.createElement("canvas"); c2.width=300; c2.height=200;
+  const ctx2 = c2.getContext("2d");
+  ctx2.drawImage(c1,-4,3);
+  ctx2.fillStyle="rgba(0,0,0,0.05)";
+  for(let i=0;i<300;i++) ctx2.fillRect(Math.random()*300, Math.random()*200, 1, 1);
+
+  setSlot("A", hashFromSource(c1), c1.toDataURL());
+  setSlot("B", hashFromSource(c2), c2.toDataURL());
+};
+
+// ---------- init ----------
+renderFeed(); renderAlerts(); updateCharts();
+</script>
+</body>
+</html>
